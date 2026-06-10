@@ -6,19 +6,17 @@ import pandas as pd
 import yfinance as yf
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import requests_cache
 
-# Inicialização do App
-app = FastAPI(
-    title="VeloFin API",
-    description="Backend de alta performance para análise de ativos financeiros",
-    version="1.0.0"
-)
+# Configuração de cache para evitar sobrecarga no Yahoo
+session = requests_cache.CachedSession('yfinance.cache')
+session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 
-# 🔐 CONFIGURAÇÃO DE CORS (Crucial para o React conseguir conversar com o Python)
+app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção no Render mudaremos para a URL do React
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -28,12 +26,19 @@ logger = logging.getLogger(__name__)
 
 def fetch_data(ticker: str, ano: int):
     try:
-        df = yf.download(
-            ticker,
+        # Usando a sessão configurada com User-Agent
+        ticker_obj = yf.Ticker(ticker, session=session)
+        df = ticker_obj.history(
             start=f"{ano}-01-01",
-            end=datetime.now().strftime("%Y-%m-%d"),
-            progress=False
+            end=datetime.now().strftime("%Y-%m-%d")
         )
+        
+        if df.empty:
+            return pd.DataFrame()
+            
+        if hasattr(df.index, 'tz') and df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+            
         return df
     except Exception as e:
         logger.error(f"Erro no yfinance para {ticker}: {e}")
@@ -42,54 +47,32 @@ def fetch_data(ticker: str, ano: int):
 def process_data(df: pd.DataFrame):
     registos_limpos = []
     preco_atual = 0.0
-
     if df is None or df.empty:
         return registos_limpos, preco_atual
 
     try:
-        # Corrige o MultiIndex do yfinance se houver
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 
-        # Extrai o último preço de fechamento de forma segura
         raw_close = df["Close"].iloc[-1]
-        if hasattr(raw_close, "__len__") and not isinstance(raw_close, (str, bytes)):
-            raw_close = raw_close[0]
         preco_atual = round(float(raw_close), 2)
 
-        # Processa o histórico para mandar para o gráfico do React
         df_recent = df.reset_index()
-        date_col = "Date" if "Date" in df_recent.columns else df_recent.columns[0]
-
         for _, row in df_recent.iterrows():
-            d_val = row[date_col]
             registos_limpos.append({
-                "date": d_val.strftime("%d/%m/%Y") if hasattr(d_val, "strftime") else str(d_val),
+                "date": row['Date'].strftime("%d/%m/%Y"),
                 "close": round(float(row["Close"]), 2),
                 "volume": int(row["Volume"])
             })
-
     except Exception as e:
-        logger.error(f"Erro no processamento dos dados: {e}")
-        raise HTTPException(status_code=500, detail="Erro interno ao processar dados analíticos.")
-
+        logger.error(f"Erro no processamento: {e}")
+        return [], 0.0
     return registos_limpos, preco_atual
 
-# 🚀 NOVA ROTA DA API DO VELOFIN (Retorna JSON puro)
 @app.get("/api/v1/analytics")
-async def get_market_data(
-    ticker: str = Query("PETR4.SA", min_length=3, max_length=15),
-    ano: int = Query(2024, ge=2000, le=datetime.now().year)
-):
+async def get_market_data(ticker: str = "PETR4.SA", ano: int = 2024):
     df = await asyncio.to_thread(fetch_data, ticker, ano)
-    
     if df.empty:
-        raise HTTPException(status_code=404, detail=f"Nenhum dado encontrado para o ticker {ticker}.")
-        
+        raise HTTPException(status_code=404, detail=f"Dados vazios para {ticker}. Tente outro ticker ou verifique a conexão.")
     registros, preco_atual = process_data(df)
-    
-    return {
-        "ticker": ticker.upper(),
-        "currentPrice": preco_atual,
-        "history": registros  # O React vai usar essa lista para desenhar o gráfico!
-    }
+    return {"ticker": ticker.upper(), "currentPrice": preco_atual, "history": registros}

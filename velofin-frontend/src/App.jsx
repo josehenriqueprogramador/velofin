@@ -8,7 +8,7 @@ function App() {
   const [ano, setAno] = useState(2024)
   const [searchTicker, setSearchTicker] = useState("PETR4.SA")
   const [searchAno, setSearchAno] = useState(2024)
-  
+
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -18,7 +18,8 @@ function App() {
       setLoading(true)
       setError(null)
       try {
-        const response = await fetch(`http://localhost:8000/api/v1/analytics?ticker=${searchTicker}&ano=${searchAno}`)
+        // URL substituída para o seu backend no Render
+        const response = await fetch(`https://velofin-api.onrender.com/api/v1/analytics?ticker=${searchTicker}&ano=${searchAno}`)
         if (!response.ok) {
           throw new Error("Ativo não encontrado ou falha no processamento.")
         }
@@ -46,7 +47,7 @@ function App() {
   return (
     <div className="velofin-container">
       <div className="content-wrapper">
-        
+
         <header>
           <h1>VELOFIN</h1>
           <p>Análise Quantitativa e Inteligência Visual de Ativos</p>
@@ -56,20 +57,20 @@ function App() {
           <form onSubmit={handleSearch}>
             <div className="input-group">
               <label>Ticker do Ativo</label>
-              <input 
-                type="text" 
-                value={ticker} 
-                onChange={(e) => setTicker(e.target.value)} 
+              <input
+                type="text"
+                value={ticker}
+                onChange={(e) => setTicker(e.target.value)}
                 placeholder="Ex: VALE3.SA, AAPL"
               />
             </div>
             <div className="input-group">
               <label>Ano Inicial</label>
-              <input 
-                type="number" 
-                value={ano} 
+              <input
+                type="number"
+                value={ano}
                 onChange={(e) => setAno(parseInt(e.target.value) || 2024)}
-                min="2000" 
+                min="2000"
                 max={new Date().getFullYear()}
               />
             </div>
@@ -80,7 +81,7 @@ function App() {
         </section>
 
         {loading && <p style={{ textAlign: 'center', color: '#38bdf8' }}>Buscando e processando dados com Pandas...</p>}
-        
+
         {error && <div className="error-message">{error}</div>}
 
         {data && !loading && (
@@ -101,7 +102,7 @@ function App() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                     <XAxis dataKey="date" stroke="#94a3b8" tickSize={10} />
                     <YAxis stroke="#94a3b8" domain={['auto', 'auto']} />
-                    <Tooltip 
+                    <Tooltip
                       contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#f8fafc' }}
                       labelStyle={{ color: '#38bdf8' }}
                     />

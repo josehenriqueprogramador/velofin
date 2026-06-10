@@ -1,18 +1,13 @@
-import os
-import asyncio
-import logging
-from datetime import datetime
-import pandas as pd
-import yfinance as yf
-from fastapi import FastAPI, Query, HTTPException
+import requests
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-import requests_cache
+from datetime import datetime
 
-# Configuração de cache para evitar sobrecarga no Yahoo
-session = requests_cache.CachedSession('yfinance.cache')
-session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-
-app = FastAPI()
+app = FastAPI(
+    title="VeloFin API",
+    description="API robusta de dados financeiros via Brapi",
+    version="2.0.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,58 +16,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-def fetch_data(ticker: str, ano: int):
-    try:
-        # Usando a sessão configurada com User-Agent
-        ticker_obj = yf.Ticker(ticker, session=session)
-        df = ticker_obj.history(
-            start=f"{ano}-01-01",
-            end=datetime.now().strftime("%Y-%m-%d")
-        )
-        
-        if df.empty:
-            return pd.DataFrame()
-            
-        if hasattr(df.index, 'tz') and df.index.tz is not None:
-            df.index = df.index.tz_localize(None)
-            
-        return df
-    except Exception as e:
-        logger.error(f"Erro no yfinance para {ticker}: {e}")
-        return pd.DataFrame()
-
-def process_data(df: pd.DataFrame):
-    registos_limpos = []
-    preco_atual = 0.0
-    if df is None or df.empty:
-        return registos_limpos, preco_atual
-
-    try:
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-
-        raw_close = df["Close"].iloc[-1]
-        preco_atual = round(float(raw_close), 2)
-
-        df_recent = df.reset_index()
-        for _, row in df_recent.iterrows():
-            registos_limpos.append({
-                "date": row['Date'].strftime("%d/%m/%Y"),
-                "close": round(float(row["Close"]), 2),
-                "volume": int(row["Volume"])
-            })
-    except Exception as e:
-        logger.error(f"Erro no processamento: {e}")
-        return [], 0.0
-    return registos_limpos, preco_atual
+# Token 'demo' funciona para testes, para produção considere obter um em brapi.dev
+BRAPI_TOKEN = "demo"
 
 @app.get("/api/v1/analytics")
-async def get_market_data(ticker: str = "PETR4.SA", ano: int = 2024):
-    df = await asyncio.to_thread(fetch_data, ticker, ano)
-    if df.empty:
-        raise HTTPException(status_code=404, detail=f"Dados vazios para {ticker}. Tente outro ticker ou verifique a conexão.")
-    registros, preco_atual = process_data(df)
-    return {"ticker": ticker.upper(), "currentPrice": preco_atual, "history": registros}
+async def get_market_data(
+    ticker: str = Query("PETR4", min_length=3, max_length=10),
+    ano: int = Query(2024, ge=2020)
+):
+    # Limpa o ticker (remove .SA se o usuário enviar, pois a Brapi usa o código puro)
+    clean_ticker = ticker.split('.')[0].upper()
+    
+    # URL da API Brapi
+    url = f"https://brapi.dev/api/quote/{clean_ticker}?token={BRAPI_TOKEN}&range=1y&interval=1d"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            raise HTTPException(status_code=404, detail="Erro ao conectar com provedor de dados.")
+        
+        data = response.json()
+        
+        if "results" not in data or not data["results"]:
+            raise HTTPException(status_code=404, detail="Ativo não encontrado.")
+        
+        # Extrai os dados
+        asset_data = data["results"][0]
+        history = asset_data.get("historicalDataPrice", [])
+        
+        # Filtra pelo ano solicitado se necessário
+        processed = [
+            {
+                "date": item.get("date"),
+                "close": item.get("close"),
+                "volume": item.get("volume")
+            }
+            for item in history 
+            if item.get("date", "").startswith(str(ano))
+        ]
+
+        return {
+            "ticker": clean_ticker,
+            "currentPrice": asset_data.get("regularMarketPrice"),
+            "history": processed
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")

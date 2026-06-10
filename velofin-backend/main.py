@@ -1,13 +1,13 @@
 import requests
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
+import logging
 
-app = FastAPI(
-    title="VeloFin API",
-    description="API robusta de dados financeiros via Brapi",
-    version="2.0.0"
-)
+# Configuração de logs para ver o erro no painel do Render
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -16,7 +16,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Token 'demo' funciona para testes, para produção considere obter um em brapi.dev
 BRAPI_TOKEN = "demo"
 
 @app.get("/api/v1/analytics")
@@ -24,27 +23,23 @@ async def get_market_data(
     ticker: str = Query("PETR4", min_length=3, max_length=10),
     ano: int = Query(2024, ge=2020)
 ):
-    # Limpa o ticker (remove .SA se o usuário enviar, pois a Brapi usa o código puro)
     clean_ticker = ticker.split('.')[0].upper()
-    
-    # URL da API Brapi
     url = f"https://brapi.dev/api/quote/{clean_ticker}?token={BRAPI_TOKEN}&range=1y&interval=1d"
     
     try:
         response = requests.get(url, timeout=10)
-        if response.status_code != 200:
-            raise HTTPException(status_code=404, detail="Erro ao conectar com provedor de dados.")
-        
         data = response.json()
         
-        if "results" not in data or not data["results"]:
-            raise HTTPException(status_code=404, detail="Ativo não encontrado.")
+        # Loga a resposta da API para podermos ver no painel do Render
+        logger.info(f"Resposta Brapi para {clean_ticker}: {data}")
+
+        if response.status_code != 200 or "results" not in data:
+            raise HTTPException(status_code=404, detail="Ativo não encontrado ou API indisponível.")
         
-        # Extrai os dados
         asset_data = data["results"][0]
         history = asset_data.get("historicalDataPrice", [])
         
-        # Filtra pelo ano solicitado se necessário
+        # Processamento seguro dos dados
         processed = [
             {
                 "date": item.get("date"),
@@ -62,4 +57,5 @@ async def get_market_data(
         }
         
     except Exception as e:
+        logger.error(f"Erro no processamento: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")

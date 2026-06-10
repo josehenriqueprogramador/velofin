@@ -20,7 +20,12 @@ function App() {
       const json = await response.json()
       
       if (!response.ok) throw new Error(json.detail || "Erro ao buscar dados")
-      setData(json)
+      
+      if (json.history && json.history.length > 0) {
+        setData(json)
+      } else {
+        throw new Error("Nenhum dado encontrado para este período.")
+      }
     } catch (err) {
       setError(err.message)
       setData(null)
@@ -38,24 +43,24 @@ function App() {
 
         <section className="search-card">
           <form onSubmit={handleSearch}>
-            <input type="text" value={ticker} onChange={(e) => setTicker(e.target.value)} />
+            <input type="text" value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="Ticker" />
             <input type="number" value={ano} onChange={(e) => setAno(e.target.value)} />
             <button type="submit"><FaSearch /> Analisar</button>
           </form>
         </section>
 
-        {loading && <p style={{textAlign: 'center'}}>Buscando...</p>}
+        {loading && <p style={{textAlign: 'center'}}>Buscando dados...</p>}
         {error && <div className="error-message">{error}</div>}
 
         {data && (
           <div className="dashboard-results">
-            <div className="metric-card" style={{ padding: '20px', textAlign: 'center' }}>
-              <h3><FaDollarSign /> Preço Atual</h3>
-              <p style={{ fontSize: '24px', fontWeight: 'bold' }}>R$ {data.currentPrice}</p>
+            <div className="metric-card" style={{ textAlign: 'center', marginBottom: '20px', padding: '15px', background: '#1e293b', borderRadius: '8px' }}>
+              <h3><FaDollarSign /> Preço Atual - {data.ticker}</h3>
+              <p style={{ fontSize: '2rem', color: '#38bdf8', fontWeight: 'bold' }}>R$ {data.currentPrice}</p>
             </div>
 
             <div className="chart-card">
-              <h3><FaChartLine /> Histórico de {data.ticker}</h3>
+              <h3><FaChartLine /> Histórico de Fechamento</h3>
               <div style={{ width: '100%', height: 350 }}>
                 <ResponsiveContainer>
                   <LineChart data={data.history}>

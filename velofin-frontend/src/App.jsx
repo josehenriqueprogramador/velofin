@@ -1,6 +1,6 @@
 import React, { useState } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
-import { FaSearch, FaChartLine } from "react-icons/fa"
+import { FaSearch, FaChartLine, FaDollarSign } from "react-icons/fa"
 import "./App.sass"
 
 function App() {
@@ -20,13 +20,7 @@ function App() {
       const json = await response.json()
       
       if (!response.ok) throw new Error(json.detail || "Erro ao buscar dados")
-      
-      // Validação: garante que o array history existe e não está vazio
-      if (json.history && json.history.length > 0) {
-        setData(json)
-      } else {
-        throw new Error("Nenhum dado encontrado para este período.")
-      }
+      setData(json)
     } catch (err) {
       setError(err.message)
       setData(null)
@@ -44,28 +38,35 @@ function App() {
 
         <section className="search-card">
           <form onSubmit={handleSearch}>
-            <input type="text" value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="Ticker" />
+            <input type="text" value={ticker} onChange={(e) => setTicker(e.target.value)} />
             <input type="number" value={ano} onChange={(e) => setAno(e.target.value)} />
             <button type="submit"><FaSearch /> Analisar</button>
           </form>
         </section>
 
-        {loading && <p style={{textAlign: 'center'}}>Buscando dados...</p>}
+        {loading && <p style={{textAlign: 'center'}}>Buscando...</p>}
         {error && <div className="error-message">{error}</div>}
 
-        {data && data.history && (
-          <div className="chart-card">
-            <h3><FaChartLine /> Histórico de {data.ticker}</h3>
-            <div style={{ width: '100%', height: 350 }}>
-              <ResponsiveContainer>
-                <LineChart data={data.history}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                  <XAxis dataKey="date" stroke="#ccc" />
-                  <YAxis domain={['auto', 'auto']} stroke="#ccc" />
-                  <Tooltip contentStyle={{backgroundColor: '#1e293b'}} />
-                  <Line type="monotone" dataKey="close" stroke="#38bdf8" strokeWidth={3} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+        {data && (
+          <div className="dashboard-results">
+            <div className="metric-card" style={{ padding: '20px', textAlign: 'center' }}>
+              <h3><FaDollarSign /> Preço Atual</h3>
+              <p style={{ fontSize: '24px', fontWeight: 'bold' }}>R$ {data.currentPrice}</p>
+            </div>
+
+            <div className="chart-card">
+              <h3><FaChartLine /> Histórico de {data.ticker}</h3>
+              <div style={{ width: '100%', height: 350 }}>
+                <ResponsiveContainer>
+                  <LineChart data={data.history}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                    <XAxis dataKey="date" stroke="#ccc" />
+                    <YAxis domain={['auto', 'auto']} stroke="#ccc" />
+                    <Tooltip contentStyle={{backgroundColor: '#1e293b'}} />
+                    <Line type="monotone" dataKey="close" stroke="#38bdf8" strokeWidth={3} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         )}

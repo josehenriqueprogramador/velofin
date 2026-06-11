@@ -15,12 +15,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BRAPI_TOKEN = "demo"
+BRAPI_TOKEN = "w8JnMyaNRtvsCMnak4W8RZo"
 
 @app.get("/api/v1/analytics")
 async def get_market_data(
     ticker: str = Query("PETR4"), 
-    ano: int = Query(2024)
+    ano: int = Query(2025)
 ):
     # Limpa o ticker para o formato que a Brapi aceita
     clean_ticker = ticker.split('.')[0].upper()

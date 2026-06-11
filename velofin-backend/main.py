@@ -1,8 +1,13 @@
+import os
 import requests
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
+from dotenv import load_dotenv
 import logging
+
+# Carrega variáveis de ambiente de um arquivo .env local (se existir)
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,35 +20,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BRAPI_TOKEN = "w8JnMyaNRtvsCMnak4W8RZo"
+# Pega o token da variável de ambiente definida no sistema ou no Render
+BRAPI_TOKEN = os.getenv("BRAPI_TOKEN")
 
 @app.get("/api/v1/analytics")
 async def get_market_data(
-    ticker: str = Query("PETR4"), 
+    ticker: str = Query("PETR4"),
     ano: int = Query(2025)
 ):
-    # Limpa o ticker para o formato que a Brapi aceita
+    if not BRAPI_TOKEN:
+        raise HTTPException(status_code=500, detail="Token de API não configurado no servidor")
+
     clean_ticker = ticker.split('.')[0].upper()
     url = f"https://brapi.dev/api/quote/{clean_ticker}?token={BRAPI_TOKEN}&range=1y&interval=1d"
-    
+
     try:
         response = requests.get(url, timeout=10)
         data = response.json()
-        
+
         if "results" not in data or not data["results"]:
             raise HTTPException(status_code=404, detail="Ativo não encontrado")
-        
+
         asset_data = data["results"][0]
         history = asset_data.get("historicalDataPrice", [])
-        
+
         processed = []
         for item in history:
-            # A API retorna o campo 'date' como um timestamp inteiro
             ts = item.get("date")
             if ts:
                 dt_object = datetime.fromtimestamp(ts)
-                
-                # Filtra pelo ano solicitado
                 if dt_object.year == ano:
                     processed.append({
                         "date": dt_object.strftime("%Y-%m-%d"),
@@ -56,7 +61,7 @@ async def get_market_data(
             "currentPrice": asset_data.get("regularMarketPrice"),
             "history": processed
         }
-        
+
     except Exception as e:
         logger.error(f"Erro no processamento: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")

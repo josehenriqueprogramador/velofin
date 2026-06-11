@@ -5,7 +5,7 @@ import "./App.sass"
 
 function App() {
   const [ticker, setTicker] = useState("PETR4")
-  const [ano, setAno] = useState(2024)
+  const [ano, setAno] = useState(2025)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -40,33 +40,30 @@ function App() {
             <button type="submit"><FaSearch /> Analisar</button>
           </form>
         </section>
-
         {loading && <p style={{textAlign: 'center'}}>Carregando...</p>}
         {error && <div className="error-message">{error}</div>}
-
         {data && (
           <div className="dashboard-results">
             <div className="metric-card" style={{ padding: '20px', textAlign: 'center', background: '#1e293b', marginBottom: '20px', borderRadius: '8px' }}>
-              <h3><FaDollarSign /> Preço Atual - {data.ticker}</h3>
-              <p style={{ fontSize: '2rem', color: '#38bdf8', margin: '0' }}>R$ {data.currentPrice}</p>
+              <h3 style={{color: '#94a3b8'}}><FaDollarSign /> Preço Atual - {data.ticker}</h3>
+              <p style={{ fontSize: '2rem', color: '#38bdf8', fontWeight: 'bold' }}>R$ {data.currentPrice}</p>
             </div>
-
-            {data.history && data.history.length > 0 && (
-              <div className="chart-card">
-                <h3><FaChartLine /> Histórico de Fechamento</h3>
-                <div style={{ width: '100%', height: 350 }}>
+            {data.history && data.history.length > 0 ? (
+              <div className="chart-card" style={{ background: '#1e293b', padding: '10px', borderRadius: '8px' }}>
+                <h3 style={{color: '#94a3b8'}}><FaChartLine /> Histórico</h3>
+                <div style={{ width: '100%', height: '300px' }}>
                   <ResponsiveContainer>
                     <LineChart data={data.history}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                      <XAxis dataKey="date" stroke="#ccc" />
-                      <YAxis domain={['auto', 'auto']} stroke="#ccc" />
-                      <Tooltip contentStyle={{backgroundColor: '#1e293b'}} />
-                      <Line type="monotone" dataKey="close" stroke="#38bdf8" strokeWidth={3} dot={false} />
+                      <XAxis dataKey="date" stroke="#ccc" fontSize={12} />
+                      <YAxis domain={['auto', 'auto']} stroke="#ccc" fontSize={12} />
+                      <Tooltip contentStyle={{backgroundColor: '#0f172a', border: 'none'}} />
+                      <Line type="monotone" dataKey="close" stroke="#38bdf8" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
-            )}
+            ) : <p style={{textAlign: 'center'}}>Nenhum dado histórico encontrado.</p>}
           </div>
         )}
       </div>
